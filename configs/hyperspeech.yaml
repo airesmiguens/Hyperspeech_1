@@ -1,21 +1,34 @@
-model_family: hyperspeech
+hyperspeech:
+  tokenization:
+    mode: "group"
+    n_groups: 8
+    group_strategy: "auto"
 
-tokenmixer:
-  enabled: true
-  d_token: 64
-  n_blocks: 3
-  dropout: 0.15
-  epochs: 120
-  batch_size: 128
-  lr: 0.001
-  weight_decay: 0.0001
+  tokenmixer:
+    d_token: 64
+    n_layers: 4
+    dropout: 0.1
+    gating: "swiglu"
+    feature_dropout: 0.10
 
-mil:
-  enabled: true
-  hidden_dim: 64
-  dropout: 0.1
+  head:
+    d_hidden: 128
+    n_layers: 2
+    dropout: 0.15
 
-regularization:
-  label_smoothing: 0.02
-  feature_dropout: 0.1
-  bagging_seeds: [42, 43, 44, 45, 46]
+  optimization:
+    lr: 0.001
+    weight_decay: 0.0007
+    max_epochs: 250
+    batch_size: 256
+    early_stopping_patience: 25
+    label_smoothing: 0.02
+
+  mil:
+    enabled: true
+    attn_hidden: 64
+    topk: 5
+
+  screening:
+    min_recall: 0.95
+    calibration_method: "platt"

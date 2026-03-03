@@ -16,6 +16,7 @@ from src.calibration import fit_calibrator
 from src.calibration import save_calibrator
 from src.metrics import evaluate_binary
 from src.models.hyperspeech_tokenmixer import HyperSpeechTokenMixer
+from src.models.hyperspeech_tokenmixer import HyperSpeechTokenMixerConfig
 from src.models.wrappers_sklearn import fit_predict_proba
 from src.models.wrappers_sklearn import predict_proba
 from src.models.wrappers_torch import TorchTrainConfig
@@ -35,6 +36,8 @@ def run_baseline_fold(
     model_name: str,
     fold: int,
     out_dir: str | Path,
+    min_recall: float = 0.95,
+    calibration_method: str = "platt",
 ) -> dict:
     x_train = df.iloc[train_idx][feature_cols].to_numpy(dtype=float)
     y_train = df.iloc[train_idx][target_col].to_numpy(dtype=int)
@@ -45,9 +48,9 @@ def run_baseline_fold(
     prob_train = predict_proba(model, x_train)
 
     thr_f1 = threshold_for_best_f1(y_train, prob_train)
-    thr_screen = threshold_for_target_recall(y_train, prob_train, target_recall=0.95)
+    thr_screen = threshold_for_target_recall(y_train, prob_train, target_recall=min_recall)
 
-    calib = fit_calibrator(y_train, prob_train, method="platt")
+    calib = fit_calibrator(y_train, prob_train, method=calibration_method)
     prob_test_cal = apply_calibrator(calib, prob_test)
 
     metrics_f1 = evaluate_binary(y_test, prob_test_cal, thr_f1)
@@ -98,23 +101,44 @@ def run_hyperspeech_tokenmixer_fold(
     fold: int,
     out_dir: str | Path,
     device: str = "cpu",
+    min_recall: float = 0.95,
+    calibration_method: str = "platt",
 ) -> dict:
     x_train = df.iloc[train_idx][feature_cols].to_numpy(dtype=float)
     y_train = df.iloc[train_idx][target_col].to_numpy(dtype=int)
     x_test = df.iloc[test_idx][feature_cols].to_numpy(dtype=float)
     y_test = df.iloc[test_idx][target_col].to_numpy(dtype=int)
 
-    model = HyperSpeechTokenMixer(n_features=x_train.shape[1], d_token=64, n_blocks=3, dropout=0.15)
-    train_cfg = TorchTrainConfig(epochs=120, batch_size=128, lr=1e-3, weight_decay=1e-4, device=device)
+    base_model = HyperSpeechTokenMixer(
+        HyperSpeechTokenMixerConfig(
+            n_features=x_train.shape[1],
+            d_token=64,
+            n_layers=3,
+            dropout=0.15,
+            token_mode="feature",
+        )
+    )
+
+    class LogitOnly(torch.nn.Module):
+        def __init__(self, model):
+            super().__init__()
+            self.model = model
+
+        def forward(self, x):
+            logits, _ = self.model(x)
+            return logits
+
+    model = LogitOnly(base_model)
+    train_cfg = TorchTrainConfig(max_epochs=120, batch_size=128, lr=1e-3, weight_decay=1e-4, device=device)
     model = train_binary_tabular_model(model, x_train, y_train, train_cfg)
 
     prob_train = predict_proba_binary(model, x_train, device=device)
     prob_test = predict_proba_binary(model, x_test, device=device)
 
     thr_f1 = threshold_for_best_f1(y_train, prob_train)
-    thr_screen = threshold_for_target_recall(y_train, prob_train, target_recall=0.95)
+    thr_screen = threshold_for_target_recall(y_train, prob_train, target_recall=min_recall)
 
-    calib = fit_calibrator(y_train, prob_train, method="platt")
+    calib = fit_calibrator(y_train, prob_train, method=calibration_method)
     prob_test_cal = apply_calibrator(calib, prob_test)
 
     metrics_f1 = evaluate_binary(y_test, prob_test_cal, thr_f1)

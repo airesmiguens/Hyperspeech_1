@@ -1,27 +1,56 @@
-project: hyperspeech
-seed: 42
+project:
+  name: hyperspeech
+  seed: 42
+  device_preference: ["cuda", "mps", "cpu"]
 
 data:
-  csv_path: data/all_data_clean.csv
-  target_col: sbp_binary
-  subject_col: PAT_ID
-  drop_cols: []
+  csv_path: "data/all_data_clean.csv"
+  id_col: "PAT_ID"
+  target_col: "sbp_binary"
+  sbp_2classes_col: "SBP-2CLASSES"
+  positive_class_value: 2
+  sbp_col: "SBP"
+  sbp_threshold: 130.0
+  leakage_cols:
+    - "PAT_ID"
+    - "sbp_binary"
+    - "SBP"
+    - "DBP"
+    - "BPM"
+    - "SBP-2CLASSES"
+    - "DBP-2CLASSES"
+    - "BP-2CLASSES"
+  demographic_cols: ["AGE", "GENDER", "HEIGHT", "WEIGHT"]
+  categorical_cols: ["GENDER"]
+  feature_sets:
+    acoustic_only:
+      include_demographics: false
+    all_features:
+      include_demographics: true
 
 splits:
-  n_outer: 5
-  random_seed: 42
-  split_path: artifacts/splits/outer_splits.json
+  outer:
+    n_splits: 5
+    shuffle: true
+    random_state: 42
+  inner:
+    n_splits: 3
+
+training:
+  subject_agg:
+    method: "mean"
+    topk: 5
 
 screening:
-  target_recall: 0.95
-  threshold_mode: recall_constrained
+  min_recall: 0.95
 
 calibration:
-  method: platt
+  enabled: true
+  method: "platt"
 
-artifacts:
-  root: artifacts
-  preds_dir: artifacts/preds
-  models_dir: artifacts/models
-  calib_dir: artifacts/calib
-  metrics_dir: artifacts/metrics
+outputs:
+  artifacts_dir: "artifacts"
+  save_models: true
+  save_preds: true
+  save_calibration: true
+  save_metrics: true

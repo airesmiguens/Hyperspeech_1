@@ -1,38 +1,58 @@
-baselines:
-  enabled:
-    - catboost
-    - histgb
-    - realmlp
-    - saint
-    - tabpfn
-    - ft_transformer
-    - tabtransformer
-    - dcnv2
-    - tabnet
-    - node
-    - carte
+models:
+  - name: "histgb"
+    type: "sklearn"
+    params:
+      max_depth: null
+      max_leaf_nodes: 31
+      learning_rate: 0.05
+      max_iter: 500
 
-training_groups:
-  classical:
-    - catboost
-    - histgb
-    - realmlp
-  foundation_and_fastdl:
-    - tabpfn
-    - tabnet
-  transformers:
-    - saint
-    - ft_transformer
-    - tabtransformer
-    - dcnv2
-    - node
-    - carte
+  - name: "catboost"
+    type: "catboost"
+    params:
+      iterations: 4000
+      learning_rate: 0.03
+      depth: 6
+      loss_function: "Logloss"
+      eval_metric: "AUC"
+      random_seed: 42
+      verbose: 200
+      allow_writing_files: false
 
-notes:
-  saint: optional_dependency
-  ft_transformer: optional_dependency
-  tabtransformer: optional_dependency
-  dcnv2: optional_dependency
-  tabnet: optional_dependency
-  node: optional_dependency
-  carte: optional_dependency
+  - name: "tabpfn"
+    type: "tabpfn"
+    params:
+      device: "auto"
+
+  - name: "realmlp"
+    type: "torch_custom"
+    params: {}
+
+  - name: "tabnet"
+    type: "tabnet"
+    params: {}
+
+  - name: "ft_transformer"
+    type: "torch_tabular"
+    params: {}
+
+  - name: "tabtransformer"
+    type: "torch_tabular"
+    params: {}
+
+  - name: "saint"
+    type: "torch_custom"
+    params: {}
+
+  - name: "dcnv2"
+    type: "torch_custom"
+    params: {}
+
+  - name: "node"
+    type: "torch_custom"
+    params: {}
+
+  - name: "carte"
+    type: "torch_custom"
+    params:
+      note: "CARTE is research-heavy; implement only if you have a clean reference implementation."

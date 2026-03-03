@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import torch
 from torch import nn
+
+from .hyperspeech_tokenmixer import HyperSpeechTokenMixer
+from .hyperspeech_tokenmixer import HyperSpeechTokenMixerConfig
 
 
 def make_padded_subject_tensor(
@@ -32,28 +37,55 @@ def make_padded_subject_tensor(
     return emb_tensor, logit_tensor, mask
 
 
-class HyperSpeechMIL(nn.Module):
-    def __init__(self, d_emb: int, hidden_dim: int = 64, dropout: float = 0.1):
+@dataclass
+class HyperSpeechMILConfig:
+    encoder: HyperSpeechTokenMixerConfig
+    attn_hidden: int = 64
+    dropout: float = 0.1
+    topk: int = 5
+
+
+class AttnPool(nn.Module):
+    def __init__(self, d_in: int, d_hidden: int):
         super().__init__()
-        self.attn = nn.Sequential(
-            nn.LayerNorm(d_emb),
-            nn.Linear(d_emb, hidden_dim),
+        self.net = nn.Sequential(
+            nn.Linear(d_in, d_hidden),
             nn.Tanh(),
-            nn.Linear(hidden_dim, 1),
+            nn.Linear(d_hidden, 1),
         )
-        self.subject_head = nn.Sequential(
-            nn.Linear(d_emb + 4, hidden_dim),
+
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        scores = self.net(x).squeeze(-1)
+        scores = scores.masked_fill(~mask, float("-inf"))
+        weights = torch.softmax(scores, dim=1)
+        return (x * weights.unsqueeze(-1)).sum(dim=1)
+
+
+class HyperSpeechMIL(nn.Module):
+    """Subject-level model: encode windows -> attention pool + robust logit stats -> subject logit."""
+
+    def __init__(self, cfg: HyperSpeechMILConfig):
+        super().__init__()
+        self.cfg = cfg
+        self.encoder = HyperSpeechTokenMixer(self.cfg.encoder)
+        d = self.cfg.encoder.d_token
+        self.pool = AttnPool(d, self.cfg.attn_hidden)
+        self.head = nn.Sequential(
+            nn.Linear(d + 4, d),
             nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, 1),
+            nn.Dropout(self.cfg.dropout),
+            nn.Linear(d, 1),
         )
 
-    def forward(self, emb_tensor: torch.Tensor, logit_tensor: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        attn_scores = self.attn(emb_tensor).squeeze(-1)
-        attn_scores = attn_scores.masked_fill(~mask, -1e9)
-        weights = torch.softmax(attn_scores, dim=1)
+    def forward(self, x_windows: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        bsz, windows, features = x_windows.shape
+        x_flat = x_windows.view(bsz * windows, features)
 
-        attn_pool = torch.sum(emb_tensor * weights.unsqueeze(-1), dim=1)
+        logits_w, emb_w = self.encoder(x_flat)
+        logit_tensor = logits_w.view(bsz, windows)
+        emb_tensor = emb_w.view(bsz, windows, -1)
+
+        attn_pool = self.pool(emb_tensor, mask)
 
         masked_logits = logit_tensor.masked_fill(~mask, 0.0)
         counts = mask.sum(dim=1).clamp(min=1)
@@ -63,10 +95,10 @@ class HyperSpeechMIL(nn.Module):
         std_logit = torch.sqrt((centered.pow(2).sum(dim=1) / counts) + 1e-12)
 
         max_logit = logit_tensor.masked_fill(~mask, -1e9).max(dim=1).values
-        top_k = min(3, logit_tensor.shape[1])
+        top_k = min(self.cfg.topk, logit_tensor.shape[1])
         topk_vals = logit_tensor.masked_fill(~mask, -1e9).topk(k=top_k, dim=1).values
         topk_mean = topk_vals.mean(dim=1)
 
         stats = torch.stack([mean_logit, std_logit, max_logit, topk_mean], dim=1)
         subject_feat = torch.cat([attn_pool, stats], dim=1)
-        return self.subject_head(subject_feat).squeeze(-1)
+        return self.head(subject_feat).squeeze(-1)
