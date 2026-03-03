@@ -1,0 +1,3 @@
+# Baselines configuration placeholder
+baselines:
+  - logistic_regression
