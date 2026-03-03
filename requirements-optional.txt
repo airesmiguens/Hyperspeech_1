@@ -1,0 +1,8 @@
+# Optional heavy baseline dependencies
+# Install with: pip install -r requirements-optional.txt
+
+pytorch-tabular
+pytorch-lightning
+
+# CARTE package name may vary by implementation source.
+# Replace/install your chosen package that provides CARTEClassifier.

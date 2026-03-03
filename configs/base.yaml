@@ -1,3 +1,27 @@
-# Base configuration placeholder
 project: hyperspeech
 seed: 42
+
+data:
+  csv_path: data/all_data_clean.csv
+  target_col: sbp_binary
+  subject_col: PAT_ID
+  drop_cols: []
+
+splits:
+  n_outer: 5
+  random_seed: 42
+  split_path: artifacts/splits/outer_splits.json
+
+screening:
+  target_recall: 0.95
+  threshold_mode: recall_constrained
+
+calibration:
+  method: platt
+
+artifacts:
+  root: artifacts
+  preds_dir: artifacts/preds
+  models_dir: artifacts/models
+  calib_dir: artifacts/calib
+  metrics_dir: artifacts/metrics

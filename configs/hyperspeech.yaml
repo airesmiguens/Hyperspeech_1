@@ -1,3 +1,21 @@
-# HyperSpeech model configuration placeholder
-model:
-  name: hyperspeech
+model_family: hyperspeech
+
+tokenmixer:
+  enabled: true
+  d_token: 64
+  n_blocks: 3
+  dropout: 0.15
+  epochs: 120
+  batch_size: 128
+  lr: 0.001
+  weight_decay: 0.0001
+
+mil:
+  enabled: true
+  hidden_dim: 64
+  dropout: 0.1
+
+regularization:
+  label_smoothing: 0.02
+  feature_dropout: 0.1
+  bagging_seeds: [42, 43, 44, 45, 46]

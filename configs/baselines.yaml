@@ -1,3 +1,38 @@
-# Baselines configuration placeholder
 baselines:
-  - logistic_regression
+  enabled:
+    - catboost
+    - histgb
+    - realmlp
+    - saint
+    - tabpfn
+    - ft_transformer
+    - tabtransformer
+    - dcnv2
+    - tabnet
+    - node
+    - carte
+
+training_groups:
+  classical:
+    - catboost
+    - histgb
+    - realmlp
+  foundation_and_fastdl:
+    - tabpfn
+    - tabnet
+  transformers:
+    - saint
+    - ft_transformer
+    - tabtransformer
+    - dcnv2
+    - node
+    - carte
+
+notes:
+  saint: optional_dependency
+  ft_transformer: optional_dependency
+  tabtransformer: optional_dependency
+  dcnv2: optional_dependency
+  tabnet: optional_dependency
+  node: optional_dependency
+  carte: optional_dependency
